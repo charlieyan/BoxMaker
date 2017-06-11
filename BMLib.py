@@ -1,9 +1,7 @@
 from itertools import chain
 
-
 #: Multiple of notch height
 IDEAL_NOTCH_WIDTH = 4
-
 
 def genFrontPoints(w, h, d, t):
     return chain(
@@ -13,10 +11,8 @@ def genFrontPoints(w, h, d, t):
         genVerticalLinePoints(0, h, -h, t, -t),
     )
 
-
 def genBackPoints(w, h, d, t):
     return genFrontPoints(w, h, d, t)
-
 
 def genLeftPoints(w, h, d, t):
     return chain(
@@ -26,10 +22,8 @@ def genLeftPoints(w, h, d, t):
         genVerticalLinePoints(-t, h, -h, t, -t),
     )
 
-
 def genRightPoints(w, h, d, t):
     return genLeftPoints(w, h, d, t)
-
 
 def genBottomPoints(w, h, d, t):
     return chain(
@@ -39,7 +33,6 @@ def genBottomPoints(w, h, d, t):
         genVerticalLinePoints(t, -d, d, -t, t),
     )
 
-
 def genTopPoints(w, h, d, t):
     return chain(
         genHorizontalLinePoints(0, 0, w, -t, 0),
@@ -47,7 +40,6 @@ def genTopPoints(w, h, d, t):
         genHorizontalLinePoints(w, -d, -w, t, 0),
         genVerticalLinePoints(0, -d, d, t, 0),
     )
-
 
 def genHorizontalLinePoints(x, y, length, notchHeight, offset):
     idealNotch = abs(notchHeight) * IDEAL_NOTCH_WIDTH
@@ -68,7 +60,6 @@ def genHorizontalLinePoints(x, y, length, notchHeight, offset):
         yield (x, y if ((i % 2) == 0) else y + notchHeight)
 
     # Last point is omitted (because it will be the first point of the next side)
-
 
 def genVerticalLinePoints(x, y, length, notchHeight, offset):
     # Symmetrical with the horizontal version, but with x & y swapped
