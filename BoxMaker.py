@@ -5,14 +5,9 @@ import traceback
 import os
 import sys
 sys.path.append(os.path.dirname(__file__))
-from BMLib import (
-    genFrontPoints,
-    genBackPoints,
-    genLeftPoints,
-    genRightPoints,
-    genBottomPoints,
-    genTopPoints,
-)
+from itertools import chain
+
+IDEAL_NOTCH_WIDTH = 4
 
 # global set of event handlers to keep them referenced for the duration of the command
 handlers = []
@@ -20,11 +15,75 @@ handlers = []
 app = adsk.core.Application.get()
 if app:
     ui = app.userInterface
+    product_units_mgr = app.activeProduct.unitsManager
+    # design = adsk.fusion.Design(app.activeProduct)
+    # design_units_mgr = design.unitsManager
 
 DEFAULT_WIDTH = '500 mm'
 DEFAULT_HEIGHT = '300 mm'
 DEFAULT_DEPTH = '400 mm'
 DEFAULT_THICKNESS = '6 mm'
+
+'''
+110 mm deep
+80 mm wide
+80 mm tall
+'''
+
+def genHorizontalLinePoints(x, y, length, notchHeight, offset):
+    idealNotch = abs(notchHeight) * IDEAL_NOTCH_WIDTH
+    notchCount = int(abs(length) / idealNotch)
+
+    if notchCount % 2 == 0:
+        notchCount += 1
+
+    notchWidth = length / notchCount
+
+    # First point
+    yield (x + offset, y)
+
+    # Two points for every side of a notch
+    for i in range(1, notchCount):
+        x = x + notchWidth
+        yield (x, y if ((i % 2) == 1) else y + notchHeight)
+        yield (x, y if ((i % 2) == 0) else y + notchHeight)
+    # Last point is omitted (because it will be the first point of the next side)
+
+def genVerticalLinePoints(x, y, length, notchHeight, offset):
+    # Symmetrical with the horizontal version, but with x & y swapped
+    points = genHorizontalLinePoints(y, x, length, notchHeight, offset)
+    for y, x in points:
+        yield (x, y)
+
+def genBackPoints(w, h, d, t):
+    return genFrontPoints(w, h, d, t)
+
+def genLeftPoints(w, h, d, t):
+    return chain(
+        genHorizontalLinePoints(0, 0, -d, t, -t),
+        genVerticalLinePoints(-d + t, 0, h, -t, 0),
+        genHorizontalLinePoints(-d, h - t, d, t, t),
+        genVerticalLinePoints(-t, h, -h, t, -t),
+    )
+
+def genRightPoints(w, h, d, t):
+    return genLeftPoints(w, h, d, t)
+
+def genBottomPoints(w, h, d, t):
+    return chain(
+        genHorizontalLinePoints(0, -t, w, t, t),
+        genVerticalLinePoints(w - t, 0, -d, t, -t),
+        genHorizontalLinePoints(w, -d + t, -w, -t, -t),
+        genVerticalLinePoints(t, -d, d, -t, t),
+    )
+
+def genTopPoints(w, h, d, t):
+    return chain(
+        genHorizontalLinePoints(0, 0, w, -t, 0),
+        genVerticalLinePoints(w, 0, -d, -t, 0),
+        genHorizontalLinePoints(w, -d, -w, t, 0),
+        genVerticalLinePoints(0, -d, d, t, 0),
+    )
 
 def getSelectedObjects(selectionInput):
     objects = []
@@ -38,20 +97,61 @@ def getSelectedObjects(selectionInput):
            objects.append(selectedObj)
     return objects
 
-def buildAll(component, w, h, d, thickness):
-    buildFront(component, w, h, d, thickness)
+def buildAll(component, w, h, d, t):
+    # expected dimensions in cm
+    # builds a box on the x,z plane
+    # with y being height, depth being along the z axis
+
+    buildFront(component, w, h, d, t)
     # buildBack(component, w, h, d, thickness)
     # buildLeft(component, w, h, d, thickness)
     # buildRight(component, w, h, d, thickness)
     # buildBottom(component, w, h, d, thickness)
     # buildTop(component, w, h, d, thickness)
 
-def buildFront(component, w, h, d, thickness):
+def genFrontPoints(w, h, d, t):
+    return chain(
+        genHorizontalLinePoints(0, 0, w, t, 0), # bottom
+        # genVerticalLinePoints(w, 0, h, -t, 0), # right
+        # genHorizontalLinePoints(w, h - t, -w, t, 0), # top
+        # genVerticalLinePoints(0, h, -h, t, -t), # left
+    )
+
+def buildFront(component, w, h, d, t):
     sketch = component.sketches.add(component.xYConstructionPlane)
-    sketchPoints(sketch, genFrontPoints(w, h, d, thickness))
+    points = list(genFrontPoints(
+        w.length,
+        h.length,
+        d.length,
+        t.length))
+    sketchPoints(sketch, points, w, h, t)
     # e = extrudeSketch(component, sketch, thickness)
     # e.faces[0].body.name = "Front"
     # moveExt(component, e, 'z', d - thickness)
+
+def sketchPoints(sketch, points, plane_ref_1, plane_ref_2, t): # plane_ref_2 is the 'height' dimension
+    lines = sketch.sketchCurves.sketchLines
+    constraints = sketch.geometricConstraints
+    # lastX, lastY = points[-1]
+    is_notch = False
+    lastX = None
+    lastY = None
+    for (x, y) in points:
+        if (lastX != None and lastY != None):
+            if (not is_notch):
+                new_line = lines.addByTwoPoints(
+                    adsk.core.Point3D.create(lastX, lastY, 0),
+                    adsk.core.Point3D.create(x, y, 0),
+                )
+            else:
+                new_line = lines.addByTwoPoints(
+                    adsk.core.Point3D.create(lastX, lastY, 0),
+                    adsk.core.Point3D.create(x, y, 0),
+                )
+                constraints.addEqual(t, new_line)
+            is_notch = not is_notch
+        lastX = x
+        lastY = y
 
 def buildBack(component, w, h, d, thickness):
     sketch = component.sketches.add(component.xYConstructionPlane)
@@ -105,18 +205,6 @@ def moveExt(component, ext, axis, distance):
     moveFeatureInput = moveFeats.createInput(entities1, transform)
     moveFeats.add(moveFeatureInput)
 
-def sketchPoints(sketch, points):
-    lines = sketch.sketchCurves.sketchLines
-    points = list(points)
-
-    lastX, lastY = points[-1]
-    for (x, y) in points:
-        lines.addByTwoPoints(
-            adsk.core.Point3D.create(lastX, lastY, 0),
-            adsk.core.Point3D.create(x, y, 0),
-        )
-        lastX, lastY = x, y
-
 def extrudeSketch(component, sketch, thickness):
     # Get the profile defined by item#0.
     prof = sketch.profiles.item(0)
@@ -138,13 +226,13 @@ def extrudeSketch(component, sketch, thickness):
 class BoxMakerCommandExecuteHandler(adsk.core.CommandEventHandler):
     def notify(self, args):
         try:
-            unitsMgr = app.activeProduct.unitsManager
             command = args.firingEvent.sender
             design = app.activeProduct
             if not design:
                 ui.messageBox('No active Fusion design', 'No Design')
                 return
             component = design.rootComponent
+            unitsMgr = design.unitsManager
 
             inputs = {}
             w_input_obj = None
@@ -156,7 +244,7 @@ class BoxMakerCommandExecuteHandler(adsk.core.CommandEventHandler):
                 if (input.id == "w_line_input"):
                     w_input_objs = getSelectedObjects(input)
                     if (len(w_input_objs) > 0):
-                        w_input_obj = w_input_objs[0] # width_input_obj.length
+                        w_input_obj = w_input_objs[0]
                 elif (input.id == "h_line_input"):
                     h_input_objs = getSelectedObjects(input)
                     if (len(h_input_objs) > 0):
@@ -170,7 +258,11 @@ class BoxMakerCommandExecuteHandler(adsk.core.CommandEventHandler):
                     if (len(t_input_objs) > 0):
                         t_input_obj = t_input_objs[0]
 
-            if (w_input_obj == None or h_input_obj == None or d_input_obj == None or t_input_obj == None):
+            if (w_input_obj == None
+                or h_input_obj == None
+                or d_input_obj == None
+                or t_input_obj == None
+                ):
                 ui.messageBox("Missing something")
                 return
 
@@ -210,34 +302,6 @@ class BoxMakerCommandCreatedHandler(adsk.core.CommandCreatedEventHandler):
             # keep the handler referenced globally
             handlers.append(onExecute)
             handlers.append(onDestroy)
-
-            cmd.commandInputs.addValueInput(
-                'widthInput',
-                'Width (mm)',
-                'mm',
-                adsk.core.ValueInput.createByString(DEFAULT_WIDTH)
-            )
-
-            cmd.commandInputs.addValueInput(
-                'heightInput',
-                'Height (mm)',
-                'mm',
-                adsk.core.ValueInput.createByString(DEFAULT_HEIGHT)
-            )
-
-            cmd.commandInputs.addValueInput(
-                'depthInput',
-                'Depth (mm)',
-                'mm',
-                adsk.core.ValueInput.createByString(DEFAULT_DEPTH)
-            )
-
-            cmd.commandInputs.addValueInput(
-                'thicknessInput',
-                'Wall Thickness',
-                'mm',
-                adsk.core.ValueInput.createByString(DEFAULT_THICKNESS)
-            )
 
             w_line_input = cmd.commandInputs.addSelectionInput(
                 'w_line_input',
