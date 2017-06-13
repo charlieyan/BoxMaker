@@ -16,8 +16,8 @@ app = adsk.core.Application.get()
 if app:
     ui = app.userInterface
     product_units_mgr = app.activeProduct.unitsManager
-    # design = adsk.fusion.Design(app.activeProduct)
-    # design_units_mgr = design.unitsManager
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    all_params = design.allParameters
 
 DEFAULT_WIDTH = '500 mm'
 DEFAULT_HEIGHT = '300 mm'
@@ -112,46 +112,96 @@ def buildAll(component, w, h, d, t):
 def genFrontPoints(w, h, d, t):
     return chain(
         genHorizontalLinePoints(0, 0, w, t, 0), # bottom
-        # genVerticalLinePoints(w, 0, h, -t, 0), # right
-        # genHorizontalLinePoints(w, h - t, -w, t, 0), # top
-        # genVerticalLinePoints(0, h, -h, t, -t), # left
+        genVerticalLinePoints(w, 0, h, -t, 0), # right
+        genHorizontalLinePoints(w, h - t, -w, t, 0), # top
+        genVerticalLinePoints(0, h, -h, t, -t), # left
     )
 
 def buildFront(component, w, h, d, t):
     sketch = component.sketches.add(component.xYConstructionPlane)
+    # included_t = sketch.project(t).item(0) # include
     points = list(genFrontPoints(
         w.length,
         h.length,
         d.length,
         t.length))
+    ui.messageBox("len(points): " + str(len(points)))
     sketchPoints(sketch, points, w, h, t)
-    # e = extrudeSketch(component, sketch, thickness)
-    # e.faces[0].body.name = "Front"
-    # moveExt(component, e, 'z', d - thickness)
+    e = extrudeSketch(component, sketch, t.length)
+    e.faces[0].body.name = "Front"
+    moveExt(component, e, 'z', d.length - t.length)
 
-def sketchPoints(sketch, points, plane_ref_1, plane_ref_2, t): # plane_ref_2 is the 'height' dimension
+'''
     lines = sketch.sketchCurves.sketchLines
     constraints = sketch.geometricConstraints
     # lastX, lastY = points[-1]
     is_notch = False
     lastX = None
     lastY = None
+    last_line = None
+    last_notch_line = None
     for (x, y) in points:
         if (lastX != None and lastY != None):
+            new_line = None
             if (not is_notch):
                 new_line = lines.addByTwoPoints(
                     adsk.core.Point3D.create(lastX, lastY, 0),
                     adsk.core.Point3D.create(x, y, 0),
                 )
             else:
-                new_line = lines.addByTwoPoints(
-                    adsk.core.Point3D.create(lastX, lastY, 0),
-                    adsk.core.Point3D.create(x, y, 0),
-                )
-                constraints.addEqual(t, new_line)
+                point_1 = adsk.core.Point3D.create(lastX, lastY, 0)
+                point_2 = adsk.core.Point3D.create(x, y, 0)
+                new_line = lines.addByTwoPoints(point_1, point_2)
+                # sketch_dimension = sketch.sketchDimensions.addDistanceDimension(
+                #     new_line.startSketchPoint,
+                #     new_line.endSketchPoint,
+                #     adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation,
+                #     adsk.core.Point3D.create(5.5, -1, 0))
+                # constraints.addEqual(new_line, t)
+                if (last_notch_line != None):
+                    constraints.addEqual(last_notch_line, new_line)
+                last_notch_line = new_line
             is_notch = not is_notch
+            if (last_line != None and new_line != None):
+                constraints.addCoincident(
+                    last_line.endSketchPoint,
+                    new_line.startSketchPoint)
+            last_line = new_line
         lastX = x
         lastY = y
+'''
+
+def sketchPoints(sketch, points, plane_ref_1, plane_ref_2, t): # plane_ref_2 is the 'height' dimension
+    lines = sketch.sketchCurves.sketchLines
+    constraints = sketch.geometricConstraints
+    lastX, lastY = points[-1]
+    is_notch = False
+    last_notch_line = None
+    last_line = None
+    for i, (x, y) in enumerate(points):
+        new_line = lines.addByTwoPoints(
+            adsk.core.Point3D.create(lastX, lastY, 0),
+            adsk.core.Point3D.create(x, y, 0),
+        )
+
+        # if (is_notch):
+        #     if (last_notch_line != None):
+        #         constraints.addEqual(last_notch_line, new_line)
+        #     last_notch_line = new_line
+
+        if (last_line != None and new_line != None):
+            constraints.addCoincident(
+                last_line.endSketchPoint,
+                new_line.startSketchPoint)
+
+        lastX, lastY = x, y
+
+        is_notch = not is_notch
+        side_i = i % len(points) / 4
+        if (side_i == 0):
+            is_notch = False
+
+        last_line = new_line
 
 def buildBack(component, w, h, d, thickness):
     sketch = component.sketches.add(component.xYConstructionPlane)
