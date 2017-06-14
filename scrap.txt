@@ -1,0 +1,131 @@
+
+expression = str(w_input_obj.length) + " cm" # API says length will always be in cm                        
+realValue = unitsMgr.evaluateExpression(expression, "mm")
+ui.messageBox(
+    "expression: " + expression + "\n" +
+    "length: " + str(w_input_obj.length) + "\n" +
+    "units: " + "mm" + "\n" +
+    "realValue: " + str(realValue))
+
+# expression = str(w_input_obj.length) + " mm"
+# realValue = unitsMgr.evaluateExpression(expression)
+# ui.messageBox(
+#     "expression: " + expression + "\n" +
+#     "distanceDisplayUnits: " + str(unitsMgr.distanceDisplayUnits) + "\n" +
+#     "internalUnits: " + str(unitsMgr.internalUnits) + "\n" +
+#     "length: " + str(w_input_obj.length) + "\n" +
+#     "units: " + unitsMgr.defaultLengthUnits + "\n" +
+#     "realValue: " + str(realValue))
+
+# expression = str(w_input_obj.length) + " mm"
+# realValue = unitsMgr.evaluateExpression(expression, "cm")
+# ui.messageBox(
+#     "expression: " + expression + "\n" +
+#     "distanceDisplayUnits: " + str(unitsMgr.distanceDisplayUnits) + "\n" +
+#     "internalUnits: " + str(unitsMgr.internalUnits) + "\n" +
+#     "length: " + str(w_input_obj.length) + "\n" +
+#     "units: " + "cm" + "\n" +
+#     "realValue: " + str(realValue))
+
+    # ui.messageBox(
+    #     "w_sketchcurve_len: " + str(w_sketchcurve_len) + "\n" +
+    #     "h_sketchcurve_len: " + str(h_sketchcurve_len) + "\n" +
+    #     "d_sketchcurve_len: " + str(d_sketchcurve_len) + "\n" +
+    #     "t_sketchcurve_len: " + str(t_sketchcurve_len) + "\n"
+    #     )
+
+    ui.messageBox("number of points: " + str(len(points)))
+    ui.messageBox("first point: " + str(points[0]))
+
+            # if (is_notch):
+            #     # create equivalence on new_line to t
+            #     constraints.addEqual(plane_ref_1, new_line)
+            #     break
+            # lastX, lastY = x, y
+            # if (num_lines > 0):
+            #     is_notch = not is_notch
+            # num_lines = num_lines + 1
+
+# ui.messageBox(str(w_input_obj.length) + " cm") # length is in cm, but why?
+# ui.messageBox(unitsMgr.defaultLengthUnits)
+
+# realValue = unitsMgr.evaluateExpression(
+#     str(w_input_obj.length) + " cm",
+#     unitsMgr.defaultLengthUnits)
+# ui.messageBox("realValue: " + str(realValue))
+
+
+            # Ensure all inputs were provided
+            requiredInputs = [
+                'widthInput',
+                'heightInput',
+                'depthInput',
+                'thicknessInput',
+                'w_line_input',
+                'h_line_input',
+                'd_line_input',
+                't_line_input'
+                ]
+            missingInputs = set(requiredInputs) - set(inputs.keys())
+            if missingInputs:
+                ui.messageBox("Missing inputs: {}".format(missingInputs))
+                return
+
+
+        # # Draw a rectangle by two points.
+        # recLines = lines.addTwoPointRectangle(
+        #     adsk.core.Point3D.create(4, 0, 0),
+        #     adsk.core.Point3D.create(7, 2, 0))
+
+        # # Use the returned lines to add some constraints.
+        # sketch.geometricConstraints.addHorizontal(recLines.item(2))
+        # sketch.geometricConstraints.addVertical(recLines.item(1))
+        # sketch.geometricConstraints.addVertical(recLines.item(3))
+
+
+        # # Draw a rectangle by three points.
+        # recLines = lines.addThreePointRectangle(adsk.core.Point3D.create(8, 0, 0), adsk.core.Point3D.create(11, 1, 0), adsk.core.Point3D.create(9, 3, 0))
+
+        # # Draw a rectangle by a center point.e
+        # recLines = lines.addCenterPointRectangle(adsk.core.Point3D.create(14, 3, 0), adsk.core.Point3D.create(16, 4, 0))
+
+
+'''
+    lines = sketch.sketchCurves.sketchLines
+    constraints = sketch.geometricConstraints
+    # lastX, lastY = points[-1]
+    is_notch = False
+    lastX = None
+    lastY = None
+    last_line = None
+    last_notch_line = None
+    for (x, y) in points:
+        if (lastX != None and lastY != None):
+            new_line = None
+            if (not is_notch):
+                new_line = lines.addByTwoPoints(
+                    adsk.core.Point3D.create(lastX, lastY, 0),
+                    adsk.core.Point3D.create(x, y, 0),
+                )
+            else:
+                point_1 = adsk.core.Point3D.create(lastX, lastY, 0)
+                point_2 = adsk.core.Point3D.create(x, y, 0)
+                new_line = lines.addByTwoPoints(point_1, point_2)
+                # sketch_dimension = sketch.sketchDimensions.addDistanceDimension(
+                #     new_line.startSketchPoint,
+                #     new_line.endSketchPoint,
+                #     adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation,
+                #     adsk.core.Point3D.create(5.5, -1, 0))
+                # constraints.addEqual(new_line, t)
+                if (last_notch_line != None):
+                    constraints.addEqual(last_notch_line, new_line)
+                last_notch_line = new_line
+            is_notch = not is_notch
+            if (last_line != None and new_line != None):
+                constraints.addCoincident(
+                    last_line.endSketchPoint,
+                    new_line.startSketchPoint)
+            last_line = new_line
+        lastX = x
+        lastY = y
+'''
